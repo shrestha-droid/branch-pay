@@ -1,0 +1,27 @@
+# One-click deploy: https://render.com/deploy?repo=https://github.com/shrestha-droid/branch-pay
+# Render asks for the values marked sync: false when you create the Blueprint.
+services:
+  - type: web
+    name: branch-pay
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: BUSINESS_NAME
+        value: Branch Pay Demo Studio
+      - key: AUTO_REMIND_MINUTES
+        value: "2"
+      - key: MAX_QUOTE_USD
+        value: "500"
