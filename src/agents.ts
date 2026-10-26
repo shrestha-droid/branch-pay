@@ -26,16 +26,22 @@ const tryNext = (err: unknown) =>
     err instanceof Error ? err.message : String(err),
   );
 
+// A model that just failed is skipped for a while, so the next call doesn't wait out its timeout again.
+const resting = new Map<string, number>();
+const REST_MS = 5 * 60_000;
+
 /** Runs an agent call on the first model that answers. One quick retry per model, then the next model. */
 async function withModel<T>(call: (model: ReturnType<typeof google>) => Promise<T>): Promise<T> {
+  const awake = MODELS.filter((id) => (resting.get(id) ?? 0) < Date.now());
   let last: unknown;
-  for (const id of MODELS) {
+  for (const id of awake.length ? awake : MODELS) {
     try {
       return await call(google(id));
     } catch (err) {
       last = err;
       if (!tryNext(err)) throw err;
-      console.warn(`Gemini model ${id} failed, trying the next one: ${err instanceof Error ? err.message : err}`);
+      resting.set(id, Date.now() + REST_MS);
+      console.warn(`Gemini model ${id} failed, resting it for 5 minutes: ${err instanceof Error ? err.message : err}`);
     }
   }
   throw last;
