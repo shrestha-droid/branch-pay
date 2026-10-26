@@ -4,6 +4,8 @@
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). Sandbox only. No real money moves.
 
+**Live demo: <https://branch-pay.onrender.com>** (free Render instance: the first load after a quiet spell can take about a minute while it wakes up).
+
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/shrestha-droid/branch-pay)
 
 ## The problem
