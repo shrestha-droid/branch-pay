@@ -21,7 +21,7 @@ export const config = {
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? '',
     model: process.env.GEMINI_MODEL ?? 'gemini-flash-latest',
     // Tried in order when the main model is busy or unavailable. Lite first: fast and rarely overloaded.
-    fallbacks: (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-lite-latest,gemini-2.5-flash')
+    fallbacks: (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-lite-latest,gemini-3.8-flash')
       .split(',')
       .map((m) => m.trim())
       .filter(Boolean),
