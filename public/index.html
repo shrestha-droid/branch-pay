@@ -247,7 +247,7 @@
     if (!c.paypalConfigured) missing.push('PayPal sandbox keys');
     if (missing.length) {
       $('banner').style.display = 'block';
-      $('banner').textContent = `Missing in .env: ${missing.join(' and ')}. See .env.example.`;
+      $('banner').textContent = `This server has no ${missing.join(' or ')} configured yet, so agents can't run. Running your own copy? Add them to .env (see .env.example).`;
     }
     $('pills').innerHTML = [
       '<span class="pill">PayPal sandbox</span>',
