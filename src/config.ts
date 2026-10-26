@@ -20,6 +20,11 @@ export const config = {
   gemini: {
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? '',
     model: process.env.GEMINI_MODEL ?? 'gemini-flash-latest',
+    // Tried in order when the main model is busy or unavailable. Lite first: fast and rarely overloaded.
+    fallbacks: (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-lite-latest,gemini-2.5-flash')
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean),
   },
   // Hard ceiling on any quote, enforced in code. The AI cannot talk its way past this.
   maxQuoteUsd: num(process.env.MAX_QUOTE_USD, 500),

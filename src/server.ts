@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { join } from 'node:path';
 import { z } from 'zod';
 import { config, geminiConfigured, paypalConfigured } from './config.js';
-import { pingModel, runBiller, runBuilder, runCollector, runScoper } from './agents.js';
+import { MODELS, pingModel, runBiller, runBuilder, runCollector, runScoper } from './agents.js';
 import { handleMcp } from './mcp.js';
 import { cancelInvoice, getAccessToken, getInvoice, recordPayment, refundInvoice, verifyWebhook } from './paypal.js';
 import {
@@ -97,8 +97,8 @@ app.get('/api/health', async (_req, res) => {
         return { ok: false, ms: Date.now() - started, error: errorMessage(err) };
       }
     };
-    const [paypal, gemini] = await Promise.all([check(getAccessToken), check(pingModel)]);
-    health = { at: Date.now(), body: { paypal, gemini: { ...gemini, model: config.gemini.model } } };
+    const [paypal, ...gemini] = await Promise.all([check(getAccessToken), ...MODELS.map((id) => check(() => pingModel(id)))]);
+    health = { at: Date.now(), body: { paypal, gemini: MODELS.map((model, i) => ({ model, ...gemini[i] })) } };
   }
   res.json(health.body);
 });
