@@ -133,6 +133,7 @@ async function quote(
   } catch (err) {
     job.status = 'failed';
     job.error = errorMessage(err);
+    console.error(`Job ${job.id}:`, job.error);
     addLog(job, 'System', `Scoping failed: ${job.error}`);
     return job;
   }
@@ -156,6 +157,8 @@ app.post('/api/jobs/:id/requote', async (req, res) => {
       job.error = undefined;
     } catch (err) {
       job.error = errorMessage(err);
+      console.error(`Job ${job.id}:`, job.error);
+    console.error(`Job ${job.id}:`, job.error);
       addLog(job, 'System', `Scoping failed again: ${job.error}`);
     }
   });
@@ -204,6 +207,8 @@ function approve(job: Job, deposit: boolean, by: string): Promise<boolean> {
       job.status = 'quoted';
       job.deposit = undefined;
       job.error = errorMessage(err);
+      console.error(`Job ${job.id}:`, job.error);
+    console.error(`Job ${job.id}:`, job.error);
       addLog(job, 'System', `Billing failed: ${job.error}`);
     }
   });
@@ -450,6 +455,8 @@ function deliver(job: Job): Promise<boolean> {
     } catch (err) {
       job.status = 'paid'; // The client already paid, so keep that fact and allow a retry.
       job.error = errorMessage(err);
+      console.error(`Job ${job.id}:`, job.error);
+    console.error(`Job ${job.id}:`, job.error);
       addLog(job, 'System', `Delivery failed, you can retry: ${job.error}`);
     }
   });
@@ -461,6 +468,7 @@ async function remind(job: Job): Promise<void> {
     job.error = undefined;
   } catch (err) {
     job.error = errorMessage(err);
+    console.error(`Job ${job.id}:`, job.error);
     // Count the attempt so a broken reminder can't retry forever on the auto-schedule.
     job.remindedAt = now();
     addLog(job, 'System', `Reminder failed: ${job.error}`);

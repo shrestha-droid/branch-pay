@@ -19,6 +19,9 @@ import { addLog, type Job, type Quote } from './store.js';
 const google = createGoogleGenerativeAI({ apiKey: config.gemini.apiKey });
 const model = () => google(config.gemini.model);
 
+// A stuck AI call must fail visibly (the job shows the error and a retry button), never hang forever.
+const TIMEOUT = { scoper: 60_000, biller: 90_000, collector: 60_000, builder: 150_000 };
+
 // ---------------------------------------------------------------------------
 // 1. Scoper
 // ---------------------------------------------------------------------------
@@ -46,6 +49,7 @@ export async function runScoper(job: Job): Promise<Quote> {
   addLog(job, 'Scoper', 'Reading the request and pricing the work...');
 
   const { output } = await generateText({
+    timeout: TIMEOUT.scoper,
     model: model(),
     output: Output.object({ schema: quoteSchema }),
     system: [
@@ -171,6 +175,7 @@ export async function runBiller(job: Job): Promise<BillingResult> {
 
   addLog(job, 'Biller', 'Preparing the PayPal invoice...');
   await generateText({
+    timeout: TIMEOUT.biller,
     model: model(),
     tools,
     stopWhen: stepCountIs(6),
@@ -217,6 +222,7 @@ export async function runCollector(job: Job): Promise<void> {
 
   addLog(job, 'Collector', `Writing reminder ${count} of ${config.maxReminders}...`);
   const { output } = await generateText({
+    timeout: TIMEOUT.collector,
     model: model(),
     output: Output.object({ schema: reminderSchema }),
     system: [
@@ -247,6 +253,7 @@ export async function runBuilder(job: Job): Promise<string> {
   addLog(job, 'Builder', 'Payment confirmed. Building the deliverable...');
 
   const { text } = await generateText({
+    timeout: TIMEOUT.builder,
     model: model(),
     system: [
       'You are the Builder, a senior front-end developer.',
