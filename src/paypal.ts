@@ -28,7 +28,7 @@ export class PayPalError extends Error {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) return cachedToken.value;
 
   const { clientId, clientSecret, baseUrl } = config.paypal;

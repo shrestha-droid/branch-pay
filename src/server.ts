@@ -2,9 +2,9 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { join } from 'node:path';
 import { z } from 'zod';
 import { config, geminiConfigured, paypalConfigured } from './config.js';
-import { runBiller, runBuilder, runCollector, runScoper } from './agents.js';
+import { pingModel, runBiller, runBuilder, runCollector, runScoper } from './agents.js';
 import { handleMcp } from './mcp.js';
-import { cancelInvoice, getInvoice, recordPayment, refundInvoice, verifyWebhook } from './paypal.js';
+import { cancelInvoice, getAccessToken, getInvoice, recordPayment, refundInvoice, verifyWebhook } from './paypal.js';
 import {
   addLog,
   createJob,
@@ -81,6 +81,26 @@ app.get('/api/config', (_req, res) => {
     webhooks: Boolean(config.paypal.webhookId),
     sandbox: true,
   });
+});
+
+// Live check of both outside services, for judges and for debugging a deploy.
+// Cached for 30 seconds so it can't be used to burn the AI quota.
+let health: { at: number; body: unknown } | null = null;
+app.get('/api/health', async (_req, res) => {
+  if (!health || Date.now() - health.at > 30_000) {
+    const check = async (run: () => Promise<unknown>) => {
+      const started = Date.now();
+      try {
+        await run();
+        return { ok: true, ms: Date.now() - started };
+      } catch (err) {
+        return { ok: false, ms: Date.now() - started, error: errorMessage(err) };
+      }
+    };
+    const [paypal, gemini] = await Promise.all([check(getAccessToken), check(pingModel)]);
+    health = { at: Date.now(), body: { paypal, gemini: { ...gemini, model: config.gemini.model } } };
+  }
+  res.json(health.body);
 });
 
 app.get('/api/jobs', (req, res) => {

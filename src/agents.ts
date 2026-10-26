@@ -22,6 +22,11 @@ const model = () => google(config.gemini.model);
 // A stuck AI call must fail visibly (the job shows the error and a retry button), never hang forever.
 const TIMEOUT = { scoper: 60_000, biller: 90_000, collector: 60_000, builder: 150_000 };
 
+/** Smallest possible model call, no retries, so a health check shows the real error fast. */
+export async function pingModel(): Promise<void> {
+  await generateText({ model: model(), prompt: 'Reply with the single word OK.', timeout: 30_000, maxRetries: 0 });
+}
+
 // ---------------------------------------------------------------------------
 // 1. Scoper
 // ---------------------------------------------------------------------------
