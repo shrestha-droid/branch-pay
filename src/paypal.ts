@@ -75,7 +75,10 @@ async function api<T>(method: 'GET' | 'POST', path: string, body?: unknown, requ
   const text = await res.text();
   const parsed = text ? safeJson(text) : {};
   if (!res.ok) {
-    const msg = (parsed as { message?: string }).message ?? res.statusText;
+    const body = parsed as { message?: string; details?: { field?: string; issue?: string; description?: string }[] };
+    // PayPal's top-level message is generic; the details say which field was wrong and why.
+    const details = (body.details ?? []).map((d) => [d.field, d.issue, d.description].filter(Boolean).join(' ')).join('; ');
+    const msg = (body.message ?? res.statusText) + (details ? ` (${details})` : '');
     throw new PayPalError(`PayPal ${method} ${path} failed (${res.status}): ${msg}`, res.status, parsed);
   }
   return parsed as T;
@@ -141,7 +144,7 @@ export async function createInvoice(input: InvoiceInput): Promise<{ id: string }
     };
   }
 
-  const invoicer: Record<string, unknown> = { name: { business_name: config.paypal.businessName } };
+  const invoicer: Record<string, unknown> = { business_name: config.paypal.businessName };
   if (config.paypal.merchantEmail) invoicer.email_address = config.paypal.merchantEmail;
   body.invoicer = invoicer;
 
