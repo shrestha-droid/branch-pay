@@ -152,6 +152,12 @@ export async function runBiller(job: Job): Promise<BillingResult> {
 
   let invoiceId: string | undefined;
   let sent = false;
+  // The SDK hands tool errors back to the model instead of throwing, so keep the real PayPal error to report.
+  let toolError: string | undefined;
+  const recordError = (err: unknown): never => {
+    toolError = err instanceof Error ? err.message : String(err);
+    throw err;
+  };
 
   const tools = {
     create_invoice: tool({
@@ -175,7 +181,7 @@ export async function runBiller(job: Job): Promise<BillingResult> {
           note,
           paymentTerm: paymentTerm as PaymentTerm,
           minimumDue: job.deposit,
-        });
+        }).catch(recordError);
         invoiceId = created.id;
         const plan = job.deposit ? `, $${job.deposit.toFixed(2)} deposit unlocks a preview` : '';
         addLog(job, 'Biller', `Created draft PayPal invoice ${invoiceId} (${paymentTerm}${plan}).`);
@@ -184,21 +190,18 @@ export async function runBiller(job: Job): Promise<BillingResult> {
     }),
 
     send_invoice: tool({
-      description: 'Send the draft invoice to the client. Call this only after create_invoice succeeded.',
-      inputSchema: z.object({
-        invoiceId: z.string().describe('The id returned by create_invoice'),
-      }),
-      execute: async ({ invoiceId: requested }) => {
-        if (!invoiceId || requested !== invoiceId) {
-          return { error: 'Unknown invoice id. Use the id returned by create_invoice.' };
-        }
+      // No inputs: it can only send the invoice this job just created, so there is nothing to get wrong or redirect.
+      description: 'Send the draft invoice you just created to the client.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!invoiceId) return { error: 'Create the invoice first.' };
         if (sent) return { error: 'Invoice already sent.' };
         try {
           await sendInvoice(invoiceId);
         } catch (err) {
           // On a retry, create_invoice returns the same invoice (idempotency key), which may already be sent.
-          const current = await getInvoice(invoiceId);
-          if (current.status === 'DRAFT') throw err;
+          const current = await getInvoice(invoiceId).catch(recordError);
+          if (current.status === 'DRAFT') recordError(err);
         }
         sent = true;
         addLog(job, 'Biller', `Sent invoice ${invoiceId} to ${job.clientEmail}.`);
@@ -226,7 +229,7 @@ export async function runBiller(job: Job): Promise<BillingResult> {
     }),
     system:
       'You are the Biller at a small digital agency. Bill the client for the approved quote using your tools: ' +
-      'first create_invoice, then send_invoice with the returned id. Then reply with one short sentence.',
+      'first create_invoice, then send_invoice. Then reply with one short sentence.',
     prompt:
       `Approved quote "${quote.title}" for ${job.clientName}, total $${quote.total.toFixed(2)} ${quote.currency}. ${quote.summary}` +
       (job.deposit
@@ -235,7 +238,8 @@ export async function runBiller(job: Job): Promise<BillingResult> {
   }));
 
   if (!invoiceId || !sent) {
-    throw new Error('The Biller did not finish creating and sending the invoice. Nothing was charged. Try approving again.');
+    const why = toolError ? ` PayPal said: ${toolError}` : '';
+    throw new Error(`The Biller did not finish creating and sending the invoice.${why} Nothing was charged. Try approving again.`);
   }
   return { invoiceId };
 }
