@@ -213,7 +213,17 @@ export async function runBiller(job: Job): Promise<BillingResult> {
     maxRetries: 1,
     model,
     tools,
-    stopWhen: stepCountIs(6),
+    stopWhen: stepCountIs(3),
+    // Plan-then-execute: the code fixes the order (create, then send, then a one-line summary).
+    // The model only fills in the note and payment terms, so even a lazy model can't skip a step.
+    prepareStep: ({ stepNumber }) => ({
+      toolChoice:
+        stepNumber === 0
+          ? { type: 'tool' as const, toolName: 'create_invoice' as const }
+          : stepNumber === 1
+            ? { type: 'tool' as const, toolName: 'send_invoice' as const }
+            : ('none' as const),
+    }),
     system:
       'You are the Biller at a small digital agency. Bill the client for the approved quote using your tools: ' +
       'first create_invoice, then send_invoice with the returned id. Then reply with one short sentence.',
