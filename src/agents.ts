@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import { config } from './config.js';
 import { createInvoice, getInvoice, remindInvoice, sendInvoice, type PaymentTerm } from './paypal.js';
-import { addLog, type Job, type Quote } from './store.js';
+import { addLog, invoiceToChase, type Job, type Quote } from './store.js';
 
 /**
  * Four agents, each with ONE job:
@@ -144,6 +144,8 @@ export function normalizeQuote(raw: z.infer<typeof quoteSchema>): Quote {
 
 export interface BillingResult {
   invoiceId: string;
+  /** Only on a deposit plan without native partial payments. */
+  balanceInvoiceId?: string;
 }
 
 export async function runBiller(job: Job): Promise<BillingResult> {
@@ -151,6 +153,7 @@ export async function runBiller(job: Job): Promise<BillingResult> {
   if (!quote) throw new Error('Cannot bill a job that has no approved quote.');
 
   let invoiceId: string | undefined;
+  let balanceId: string | undefined;
   let sent = false;
   // The SDK hands tool errors back to the model instead of throwing, so keep the real PayPal error to report.
   let toolError: string | undefined;
@@ -172,19 +175,39 @@ export async function runBiller(job: Job): Promise<BillingResult> {
       }),
       execute: async ({ note, paymentTerm }) => {
         if (invoiceId) return { error: 'Invoice already created.', invoiceId };
-        const created = await createInvoice({
-          jobId: job.id,
+        const base = {
           recipientEmail: job.clientEmail,
           recipientName: job.clientName,
           currency: quote.currency,
-          items: quote.items,
           note,
           paymentTerm: paymentTerm as PaymentTerm,
-          minimumDue: job.deposit,
-        }).catch(recordError);
-        invoiceId = created.id;
-        const plan = job.deposit ? `, $${job.deposit.toFixed(2)} deposit unlocks a preview` : '';
-        addLog(job, 'Biller', `Created draft PayPal invoice ${invoiceId} (${paymentTerm}${plan}).`);
+        };
+        const deposit = job.deposit;
+        if (!deposit) {
+          invoiceId = (await createInvoice({ ...base, jobId: job.id, items: quote.items }).catch(recordError)).id;
+          addLog(job, 'Biller', `Created draft PayPal invoice ${invoiceId} (${paymentTerm}).`);
+          return { invoiceId, status: 'DRAFT', total: quote.total };
+        }
+        // Deposit plan: one invoice with PayPal's native partial payments where the merchant's country allows it,
+        // otherwise a deposit invoice plus a balance invoice. Amounts always come from the approved quote.
+        try {
+          invoiceId = (await createInvoice({ ...base, jobId: job.id, items: quote.items, minimumDue: deposit })).id;
+          addLog(job, 'Biller', `Created draft PayPal invoice ${invoiceId} (${paymentTerm}, $${deposit.toFixed(2)} deposit unlocks a preview).`);
+        } catch (err) {
+          if (!/partial payments are not available/i.test(err instanceof Error ? err.message : '')) recordError(err);
+          const balance = Math.round((quote.total - deposit) * 100) / 100;
+          invoiceId = (await createInvoice({
+            ...base,
+            jobId: `${job.id}-deposit`,
+            items: [{ name: 'Deposit (50%)', description: `${quote.title}: unlocks a watermarked preview`, amount: deposit }],
+          }).catch(recordError)).id;
+          balanceId = (await createInvoice({
+            ...base,
+            jobId: `${job.id}-balance`,
+            items: [{ name: 'Balance (50%)', description: `${quote.title}: unlocks the final files`, amount: balance }],
+          }).catch(recordError)).id;
+          addLog(job, 'Biller', `PayPal has no partial payments for this merchant's country, so: deposit invoice ${invoiceId} ($${deposit.toFixed(2)}) and balance invoice ${balanceId} ($${balance.toFixed(2)}).`);
+        }
         return { invoiceId, status: 'DRAFT', total: quote.total };
       },
     }),
@@ -196,15 +219,17 @@ export async function runBiller(job: Job): Promise<BillingResult> {
       execute: async () => {
         if (!invoiceId) return { error: 'Create the invoice first.' };
         if (sent) return { error: 'Invoice already sent.' };
-        try {
-          await sendInvoice(invoiceId);
-        } catch (err) {
-          // On a retry, create_invoice returns the same invoice (idempotency key), which may already be sent.
-          const current = await getInvoice(invoiceId).catch(recordError);
-          if (current.status === 'DRAFT') recordError(err);
+        for (const id of balanceId ? [invoiceId, balanceId] : [invoiceId]) {
+          try {
+            await sendInvoice(id);
+          } catch (err) {
+            // On a retry, create_invoice returns the same invoice (idempotency key), which may already be sent.
+            const current = await getInvoice(id).catch(recordError);
+            if (current.status === 'DRAFT') recordError(err);
+          }
         }
         sent = true;
-        addLog(job, 'Biller', `Sent invoice ${invoiceId} to ${job.clientEmail}.`);
+        addLog(job, 'Biller', `Sent ${balanceId ? `invoices ${invoiceId} and ${balanceId}` : `invoice ${invoiceId}`} to ${job.clientEmail}.`);
         return { invoiceId, status: 'SENT' };
       },
     }),
@@ -241,7 +266,7 @@ export async function runBiller(job: Job): Promise<BillingResult> {
     const why = toolError ? ` PayPal said: ${toolError}` : '';
     throw new Error(`The Biller did not finish creating and sending the invoice.${why} Nothing was charged. Try approving again.`);
   }
-  return { invoiceId };
+  return { invoiceId, balanceInvoiceId: balanceId };
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +311,7 @@ export async function runCollector(job: Job): Promise<void> {
       `${stage}\nWaiting for about ${waited}. This is reminder number ${count} of ${config.maxReminders}.`,
   }));
 
-  await remindInvoice(job.invoice.id, output.subject.trim(), output.note.trim());
+  await remindInvoice(invoiceToChase(job)!, output.subject.trim(), output.note.trim());
   job.reminders = count;
   job.remindedAt = new Date().toISOString();
   addLog(job, 'Collector', `Sent reminder ${count} via PayPal: "${output.subject.trim()}"`);

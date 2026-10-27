@@ -8,8 +8,10 @@ import { cancelInvoice, getAccessToken, getInvoice, recordPayment, refundInvoice
 import {
   addLog,
   createJob,
+  combineInvoices,
   depositFor,
   findJobByInvoice,
+  invoiceToChase,
   getJob,
   listJobs,
   paymentEvent,
@@ -45,6 +47,14 @@ async function exclusive(job: Job, step: () => Promise<void>): Promise<boolean> 
 }
 
 const waitingForPayment = (job: Job) => job.status === 'invoiced' || job.status === 'preview';
+
+/** The job's payment state from PayPal: one invoice, or a deposit + balance pair read as one. */
+async function readInvoice(job: Job) {
+  const first = await getInvoice(job.invoice!.id);
+  return job.balanceInvoice ? combineInvoices(first, await getInvoice(job.balanceInvoice.id)) : first;
+}
+/** Every PayPal invoice behind a job. */
+const invoiceIds = (job: Job) => [job.invoice!.id, ...(job.balanceInvoice ? [job.balanceInvoice.id] : [])];
 
 // Every browser gets its own workspace (a random id kept in localStorage), so visitors to a public
 // deployment only see their own jobs. Job ids are unguessable UUIDs, so they work as access tokens.
@@ -215,9 +225,11 @@ function approve(job: Job, deposit: boolean, by: string): Promise<boolean> {
       `Approved the ${usd(quote.total)} quote` + (job.deposit ? ` with a ${usd(job.deposit)} deposit first.` : ', billed in full.'),
     );
     try {
-      const { invoiceId } = await runBiller(job);
-      const inv = await getInvoice(invoiceId);
-      job.invoice = { id: invoiceId, status: inv.status, url: inv.recipientViewUrl, paid: inv.paidAmount, due: inv.dueAmount };
+      const { invoiceId, balanceInvoiceId } = await runBiller(job);
+      job.invoice = { id: invoiceId, status: 'SENT' };
+      job.balanceInvoice = balanceInvoiceId ? { id: balanceInvoiceId } : undefined;
+      const inv = await readInvoice(job);
+      Object.assign(job.invoice, { status: inv.status, url: inv.recipientViewUrl, paid: inv.paidAmount, due: inv.dueAmount });
       job.invoicedAt = job.dueSince = now();
       job.status = 'invoiced';
       job.error = undefined;
@@ -243,12 +255,14 @@ app.post('/api/jobs/:id/sandbox-pay', async (req, res) => {
 
   const { invoice, quote } = job;
   const ran = await exclusive(job, async () => {
-    const inv = await getInvoice(invoice.id);
+    const inv = await readInvoice(job);
     const due = inv.dueAmount || quote.total - inv.paidAmount;
     const payDeposit = job.status === 'invoiced' && job.deposit !== undefined && inv.paidAmount < job.deposit;
     const amount = Math.round((payDeposit ? job.deposit! - inv.paidAmount : due) * 100) / 100;
     if (amount <= 0) return;
-    await recordPayment(invoice.id, amount, quote.currency);
+    // With a deposit + balance pair, pay whichever invoice is next.
+    const target = job.balanceInvoice && !payDeposit ? job.balanceInvoice.id : invoice.id;
+    await recordPayment(target, amount, quote.currency);
     const what = payDeposit ? 'deposit' : job.status === 'preview' ? 'balance' : 'full';
     addLog(job, 'System', `Demo shortcut: recorded a ${usd(amount)} sandbox payment (${what}).`);
   });
@@ -289,7 +303,7 @@ app.post('/api/jobs/:id/cancel', async (req, res) => {
 
   const invoice = job.invoice;
   const ran = await exclusive(job, async () => {
-    await cancelInvoice(invoice.id, 'This invoice was cancelled. No payment is due.');
+    for (const id of invoiceIds(job)) await cancelInvoice(id, 'This invoice was cancelled. No payment is due.');
     invoice.status = 'CANCELLED';
     job.status = 'cancelled';
     addLog(job, 'You', `Cancelled invoice ${invoice.id}.`);
@@ -310,18 +324,20 @@ app.post('/api/jobs/:id/refund', async (req, res) => {
   const invoice = job.invoice;
   const ran = await exclusive(job, async () => {
     const wasPreview = job.status === 'preview';
-    const amount = await refundInvoice(invoice.id);
+    let amount = 0;
+    for (const id of invoiceIds(job)) amount += await refundInvoice(id);
+    const unpaid = invoiceToChase(job);
     job.status = 'refunded';
     job.refundedAt = now();
     job.error = undefined;
     addLog(job, 'You', `Refunded ${usd(amount)} to ${job.clientEmail}. The deliverable is locked again.`);
     if (wasPreview) {
       // The balance is no longer wanted. Best effort: PayPal may not allow cancelling a partly paid invoice.
-      await cancelInvoice(invoice.id, 'This project was refunded. No further payment is due.').catch((err) =>
+      await cancelInvoice(unpaid!, 'This project was refunded. No further payment is due.').catch((err) =>
         addLog(job, 'System', `Could not cancel the remaining balance: ${errorMessage(err)}`),
       );
     }
-    const inv = await getInvoice(invoice.id).catch(() => undefined);
+    const inv = await readInvoice(job).catch(() => undefined);
     if (inv) Object.assign(invoice, { status: inv.status, paid: inv.paidAmount, due: inv.dueAmount });
   });
   if (!ran) return void res.status(409).json({ error: 'Already working on this job.' });
@@ -413,7 +429,7 @@ async function checkPayment(job: Job): Promise<void> {
   checking.add(job.id);
   let inv;
   try {
-    inv = await getInvoice(job.invoice.id);
+    inv = await readInvoice(job);
   } finally {
     checking.delete(job.id);
   }

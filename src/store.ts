@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
+import type { InvoiceSummary } from './paypal.js';
 
 /**
  * quoted -> invoicing -> invoiced -> paid -> delivering -> delivered
@@ -54,6 +55,11 @@ export interface Job {
   /** Set when the human approved a deposit plan: the amount that unlocks the preview. */
   deposit?: number;
   invoice?: { id: string; status: string; url?: string; paid?: number; due?: number };
+  /**
+   * Deposit plan where PayPal offers no partial payments (it depends on the merchant's country):
+   * `invoice` is then the deposit invoice and this one is the balance. Both are sent at approval.
+   */
+  balanceInvoice?: { id: string };
   invoicedAt?: string;
   /** When the amount currently owed became due (invoice sent, or preview ready). Drives auto-reminders. */
   dueSince?: string;
@@ -120,7 +126,7 @@ export function createJob(
 export const getJob = (id: string): Job | undefined => jobs.get(id);
 
 export const findJobByInvoice = (invoiceId: string): Job | undefined =>
-  [...jobs.values()].find((j) => j.invoice?.id === invoiceId);
+  [...jobs.values()].find((j) => j.invoice?.id === invoiceId || j.balanceInvoice?.id === invoiceId);
 
 /** All jobs, newest first. Pass an owner to get only that workspace's jobs. */
 export const listJobs = (owner?: string): Job[] =>
@@ -165,6 +171,27 @@ export function paymentEvent(
   }
   if (job.status === 'preview' && inv.paid) return 'balance_paid';
   return null;
+}
+
+/** A deposit invoice and a balance invoice, read as one payment: what the payment rules above expect. */
+export function combineInvoices(deposit: InvoiceSummary, balance: InvoiceSummary): InvoiceSummary {
+  return {
+    id: deposit.id,
+    status: deposit.paid ? balance.status : deposit.status,
+    paid: deposit.paid && balance.paid,
+    cancelled: deposit.cancelled,
+    paidAmount: Math.round((deposit.paidAmount + balance.paidAmount) * 100) / 100,
+    dueAmount: Math.round((deposit.dueAmount + balance.dueAmount) * 100) / 100,
+    recipientViewUrl: deposit.paid ? balance.recipientViewUrl : deposit.recipientViewUrl,
+    transactions: [...deposit.transactions, ...balance.transactions],
+  };
+}
+
+/** The invoice the client should pay next (and the one reminders are about). */
+export function invoiceToChase(job: Pick<Job, 'invoice' | 'balanceInvoice' | 'deposit'>): string | undefined {
+  if (!job.invoice) return undefined;
+  const depositPaid = (job.invoice.paid ?? 0) >= (job.deposit ?? Infinity);
+  return job.balanceInvoice && depositPaid ? job.balanceInvoice.id : job.invoice.id;
 }
 
 /** Whether the Collector should send a reminder on its own right now. */
