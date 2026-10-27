@@ -44,7 +44,7 @@ Until PayPal confirms payment, the deliverable answers **HTTP 402 Payment Requir
 
 | | What it does here |
 |---|---|
-| **PayPal Invoicing API v2** | Create, send, remind, cancel, read status, record payments and refunds. **Native partial payments** (`allow_partial_payment` + `minimum_amount_due`) power the deposit plan. Hand-written REST in `src/paypal.ts`, so every call is visible. |
+| **PayPal Invoicing API v2** | Create, send, remind, cancel, read status, record payments and refunds. The deposit plan uses **native partial payments** (`allow_partial_payment` + `minimum_amount_due`) where PayPal offers them, and otherwise a deposit invoice plus a balance invoice (PayPal limits partial payments by the merchant's country). Hand-written REST in `src/paypal.ts`, so every call is visible. |
 | **PayPal Payments API v2** | Refunds money the client paid through PayPal (`/v2/payments/captures/{id}/refund`). |
 | **PayPal Webhooks** | `INVOICING.INVOICE.PAID` / `CANCELLED` trigger an instant check. Signatures verified with `verify-webhook-signature` when `PAYPAL_WEBHOOK_ID` is set. |
 | **PayPal OAuth 2.0** | Client-credentials token, cached until near expiry. |
@@ -113,7 +113,7 @@ On Render's free plan the instance sleeps after 15 minutes idle and its disk is 
 ## Demo walkthrough (about 3 minutes)
 
 1. Click **Fill example**, enter your sandbox personal email, **Get a quote**.
-2. **Approve · 50% deposit first.** The Biller creates the invoice with a partial-payment minimum and sends it.
+2. **Approve · 50% deposit first.** The Biller sends one invoice with a partial-payment minimum, or a deposit invoice plus a balance invoice if your sandbox account's country has no partial payments.
 3. The Collector chases on its own (`AUTO_REMIND_MINUTES=2`), or click **Send reminder now**.
 4. Pay the deposit (in PayPal as the sandbox buyer, or **Demo: pay deposit**). The Builder runs; a watermarked preview appears.
 5. Pay the balance. The watermark goes and **Download** unlocks.

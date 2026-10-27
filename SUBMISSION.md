@@ -24,7 +24,7 @@ A client describes what they need, either in the dashboard or through their own 
 
 1. **Scoper agent** turns the request into a fixed-price quote. A hard price cap is enforced in code, and the Scoper reports any instructions hidden in the request that it ignored.
 2. **A human approves** it: bill in full, or ask for a **50% deposit first**. (Optionally, a spending limit set in advance auto-approves small jobs.)
-3. **Biller agent** creates and sends a real **PayPal invoice** with tool calls. The deposit plan uses PayPal's native partial payments.
+3. **Biller agent** creates and sends a real **PayPal invoice** with tool calls. The deposit plan uses PayPal's native partial payments where they're available, and otherwise sends a deposit invoice plus a balance invoice.
 4. **Collector agent** chases the unpaid invoice **on its own**, with reminders whose tone fits how long the client has waited, sent through PayPal's reminder API.
 5. **Builder agent** starts the moment PayPal reports payment (webhook, with polling as a fallback). After the deposit, the client sees a **watermarked preview**; when the balance is paid, the final files unlock for download.
 6. A human can **refund** with one click. Money goes back through PayPal and access is revoked.
@@ -57,7 +57,7 @@ We built on two 2025 papers on securing LLM agents. [*Design Patterns for Securi
 ## Challenges we ran into
 
 - **Trusting an LLM near money.** The obvious design is to hand the model a full invoicing toolkit. We went the other way: every money field lives in server state, and each agent gets only the narrowest tools its job needs.
-- **Partial payments.** Deposit → preview → balance → final meant modelling payment state carefully. The transition logic is a pure function with tests, including a client paying everything at once on a deposit plan.
+- **Partial payments.** Deposit → preview → balance → final meant modelling payment state carefully. Then the live sandbox told us partial payments aren't available in our merchant country, so the Biller now falls back to a deposit invoice plus a balance invoice, read by the server as one payment. The transition logic is a pure function with tests for both shapes, including a client paying everything at once.
 - **Rounding.** Our own test caught that a $1 minimum per line item could push a scaled quote $2.51 over the cap. Now the code takes the excess off the biggest line.
 - **Letting outside agents in safely.** Giving buyers' AI agents an MCP interface meant deciding exactly what they may do. They can ask and look; only people approve, pay and refund.
 - **Public demo hygiene.** A hosted demo needs per-visitor workspaces and rate limits on AI calls, so judges don't see each other's jobs and nobody can burn the quota.
@@ -102,7 +102,7 @@ Record at 1280×800 or larger, on the **hosted Render URL**. In Render, set `AUT
 | 0:00 | The app | "Freelancers don't lose money on the work. They lose it chasing invoices and deciding when it's safe to hand over the files. Branch Pay gives that whole loop to AI agents, and keeps people on every money decision." |
 | 0:15 | **Fill example** → **Get a quote** | "A bakery wants a website. The Scoper agent prices it, under a hard cap enforced in code." |
 | 0:28 | **Approve · 50% deposit first** | "I'll ask for half up front. The Biller agent creates a real PayPal invoice with tool calls. Its tools can't touch the amount or who gets billed; those come from the quote I approved." |
-| 0:45 | Sandbox buyer's PayPal tab | "Here it is in the client's PayPal, with partial payment on." |
+| 0:45 | Sandbox buyer's PayPal tab | "Here it is in the client's PayPal: a deposit invoice that unlocks a preview, and the balance." |
 | 0:52 | Collector fires in the feed | "They haven't paid, so the Collector agent chases on its own. It writes the words; the code decides when, and stops at three." |
 | 1:05 | Pay the deposit in PayPal | "The client pays the deposit. PayPal tells us, the Builder agent starts..." |
 | 1:15 | Watermarked preview | "...and the client gets a watermarked preview. Enough to trust it, not enough to walk away with it." |
