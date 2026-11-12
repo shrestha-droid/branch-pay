@@ -82,6 +82,7 @@ test('reminders chase the right invoice', () => {
 test('a model over its quota rests until Gemini says to retry', () => {
   assert.equal(restMs('Quota exceeded. Please retry in 2h33m25.3s.'), Math.round((2 * 3600 + 33 * 60 + 25.3) * 1000));
   assert.equal(restMs('Please retry in 41s.'), 15 * 60_000); // never shorter than the normal rest
-  assert.equal(restMs('This model is currently experiencing high demand.'), 15 * 60_000);
+  assert.equal(restMs('This model is currently experiencing high demand.'), 2 * 60_000); // a spike passes quickly
+  assert.equal(restMs('The operation was aborted due to timeout'), 15 * 60_000);
   assert.equal(restMs('Please retry in 99h0m0s.'), 24 * 3_600_000); // capped at a day
 });

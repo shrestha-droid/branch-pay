@@ -764,7 +764,7 @@
         { field: 'client', width: 130 },
         { field: 'project', flex: 1, minWidth: 140 },
         { field: 'status', width: 125, cellRenderer: (p) => (p.value ? `<span class="status s-${esc(p.value)}">${esc(SHORT[p.value] || LABEL[p.value] || p.value)}</span>` : '') },
-        { field: 'source', width: 90, cellRenderer: (p) => (p.value === 'AI agent' ? '<span class="status s-agent">AI agent</span>' : esc(p.value || '')) },
+        { field: 'source', width: 108, cellRenderer: (p) => (p.value === 'AI agent' ? '<span class="status s-agent">AI agent</span>' : esc(p.value || '')) },
         { headerName: 'Money', children: [
           { field: 'total', type: 'rightAligned', width: 100, valueFormatter: usd, filter: 'agNumberColumnFilter' },
           { field: 'paid', type: 'rightAligned', width: 95, valueFormatter: usd, filter: 'agNumberColumnFilter',
@@ -775,7 +775,7 @@
         { headerName: 'Collections', children: [
           { field: 'waiting', headerName: 'Waiting', width: 80, filter: false, valueFormatter: (p) => (p.value == null ? '' : duration(p.value)) },
           { colId: 'aging', headerName: 'Aging', width: 105, valueGetter: (p) => (p.node.rowPinned ? '' : aging(p.data.waiting)) },
-          { field: 'reminders', width: 90, filter: 'agNumberColumnFilter',
+          { field: 'reminders', width: 112, filter: 'agNumberColumnFilter',
             valueFormatter: (p) => (p.node.rowPinned || !p.data.invoice || (!p.value && !VIEWS.open(p.data)) ? '' : `${p.value} of ${state.cfg.maxReminders}`) },
           { field: 'timeToPay', headerName: 'Time to pay', width: 105, filter: false, valueFormatter: (p) => (p.value == null ? '' : duration(p.value)) },
         ] },

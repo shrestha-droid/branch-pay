@@ -510,11 +510,26 @@ async function tick(job: Job): Promise<void> {
   }
 }
 
+// A paid job whose build failed (busy AI models, a restart mid-build) is retried without anyone pressing
+// a button: the client has paid, so the server keeps trying. Five tries, 30 seconds apart, then it is left
+// for the "Retry delivery" button.
+// ponytail: counts live in memory, so a restart allows five more tries.
+const buildRetries = new Map<string, { tries: number; at: number }>();
+function retryBuild(job: Job): void {
+  const r = buildRetries.get(job.id) ?? { tries: 0, at: 0 };
+  if (busy.has(job.id) || r.tries >= 5 || Date.now() - r.at < 30_000) return;
+  buildRetries.set(job.id, { tries: r.tries + 1, at: Date.now() });
+  addLog(job, 'System', `Retrying the build on its own (try ${r.tries + 1} of 5)...`);
+  deliver(job).catch((err) => console.error(`Build retry for ${job.id} failed:`, errorMessage(err)));
+}
+
 if (paypalConfigured) {
   setInterval(() => {
     for (const job of listJobs()) {
       if (waitingForPayment(job)) {
         tick(job).catch((err) => console.error(`Polling ${job.id} failed:`, errorMessage(err)));
+      } else if (job.status === 'paid' && geminiConfigured) {
+        retryBuild(job);
       }
     }
   }, config.pollMs);

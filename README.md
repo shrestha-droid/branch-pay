@@ -29,7 +29,7 @@ Each browser gets its own private workspace, so you only see your own jobs. "Dem
 | ![A job on the deposit plan: rubber-stamp status, agent rail, line items, both PayPal invoices](docs/gallery/2-job.jpg) | ![Prompt injection caught: four hidden instructions struck through](docs/gallery/5-prompt-injection.jpg) |
 | **A job on the deposit plan.** Status stamp, which agent is working, both PayPal invoices, and the guardrails. | **A prompt injection, caught.** The price cap held and the recipient couldn't change. |
 | ![The website the Builder made, watermarked until the balance is paid](docs/gallery/4-deliverable.jpg) | ![The AG Grid ledger](docs/gallery/6-ledger.jpg) |
-| **The Builder's website,** watermarked until the balance is paid. | **The ledger** (AG Grid): every quote, invoice and payment. |
+| **The Builder's website,** watermarked until the balance is paid. | **The receivables ledger** (AG Grid, shown with sample records): aging, reminders, and bulk chasing. |
 
 ## The problem
 
@@ -73,7 +73,7 @@ Until PayPal confirms payment, the deliverable answers **HTTP 402 Payment Requir
 | **PayPal OAuth 2.0** | Client-credentials token, cached until near expiry. |
 | **Gemini** (Vercel AI SDK) | **Scoper**: structured quote + a list of injection attempts it ignored. **Biller**: tool calling. **Collector**: reminders whose tone fits how long the client has waited and what payment unlocks. **Builder**: the HTML deliverable. |
 | **Model Context Protocol** | `/mcp/<workspace>` is an MCP server (Streamable HTTP). A client's AI assistant can `request_quote`, `get_job` and `list_jobs`. It cannot approve, pay or refund. |
-| **AG Grid** | The **Ledger**: every quote, invoice and payment with filters, sorting, quick search, a totals row and CSV export. |
+| **AG Grid** | The **Ledger** is the receivables desk: quick views (awaiting approval, awaiting payment, paid, via AI agent), grouped Money and Collections columns, aging buckets, a totals row that follows the active view and filters, quick search, CSV export, and row selection to have the Collector remind several clients at once. |
 | **Render** | One-click deploy from `render.yaml`. |
 
 ## Agentic commerce: let your clients' AI agents hire you
@@ -143,7 +143,7 @@ On Render's free plan the instance sleeps after 15 minutes idle and its disk is 
 6. **Refund**: money back, deliverable locked again.
 7. **Try a prompt injection**: watch the Scoper ignore it and the cap hold.
 8. **Connect an AI agent**: request a quote from Claude or the MCP Inspector and watch it land in the pipeline.
-9. **Ledger**: the whole book in AG Grid; export it as CSV.
+9. **Ledger**: the receivables desk in AG Grid. Switch views, tick unpaid rows and press **Remind selected**, or export the book as CSV.
 
 ## Project layout
 
@@ -162,6 +162,7 @@ render.yaml           Render Blueprint
 ## Known limits
 
 - Prototype: jobs live in a local JSON file, and rate limits are per process.
+- The live demo runs on Gemini's free tier, which caps requests per day. The agents fall back across three models and retry a paid build on their own, but a busy day can still exhaust the quota. `/api/health` shows each model's last result without spending a request.
 - The "Demo: pay" buttons are a sandbox shortcut (the merchant recording a payment), not a customer payment.
 - The preview is watermarked, not hidden: its HTML is visible in view-source.
 - Refunds of real PayPal payments use the invoice's PayPal transaction id as the capture id.

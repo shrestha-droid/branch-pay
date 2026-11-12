@@ -34,7 +34,9 @@ const REST_MS = 15 * 60_000;
 export function restMs(message: string): number {
   const m = /retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i.exec(message);
   const hinted = m ? (Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0)) * 1000 : 0;
-  return Math.min(Math.max(hinted, REST_MS), 24 * 3_600_000);
+  // "High demand" is a short spike, so that model is worth another try after two minutes.
+  const base = /high demand|overloaded/i.test(message) ? 2 * 60_000 : REST_MS;
+  return Math.min(Math.max(hinted, base), 24 * 3_600_000);
 }
 
 // What each model did the last time an agent really used it. The health page reads this, so checking
