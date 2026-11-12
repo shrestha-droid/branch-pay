@@ -46,7 +46,7 @@
   @keyframes run { to { transform: translateX(-50%); } }
 
   /* Nav */
-  .nav { border-bottom: 1px solid var(--rule-2); background: rgba(241,239,231,.92); position: sticky; top: 0; z-index: 30; }
+  .nav { border-bottom: 1px solid var(--rule-2); background: var(--paper); position: sticky; top: 0; z-index: 30; }
   .nav .wrap { display: flex; align-items: center; gap: 2rem; height: 60px; }
   .logo { display: flex; align-items: center; gap: .7rem; text-decoration: none; color: var(--ink); }
   .mark { width: 30px; height: 30px; border: 1.5px solid var(--ink); display: grid; place-items: center; font: 500 15px/1 var(--display); font-style: italic; position: relative; }
@@ -213,6 +213,11 @@
   .guard li { padding: .5rem 0 .5rem 1.7rem; position: relative; color: var(--ink-2); border-bottom: 1px solid var(--rule); }
   .guard li::before { content: "✓"; position: absolute; left: .2rem; top: .5rem; color: var(--green); font: 500 13px var(--mono); }
   .guard li.wait { color: var(--ink-3); } .guard li.wait::before { content: "○"; color: var(--ink-3); }
+  .caught { margin: 1.2rem 0 0; padding: .8rem 1rem .9rem; border: 1px solid rgba(179,38,30,.45); border-left: 3px solid var(--red); background: #f7ece6; }
+  .caught b { display: block; font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--red); margin-bottom: .45rem; }
+  .caught ul { margin: 0; padding: 0; list-style: none; }
+  .caught li { font: 400 1.02rem/1.45 var(--display); font-style: italic; color: #6b1a14; text-decoration: line-through; text-decoration-color: rgba(179,38,30,.6); }
+  .caught p { margin: .5rem 0 0; font-size: 13px; color: var(--ink-2); }
   .working { display: inline-flex; align-items: center; gap: .6rem; color: var(--pen); font: 400 12px var(--mono); letter-spacing: .04em; }
   .working::after { content: "▍"; animation: blink 1s steps(2) infinite; }
 
@@ -641,7 +646,13 @@
       [true, `Invoice can only go to ${job.clientEmail}, for the quoted amounts (the Biller has no amount or recipient input)`],
       [true, 'Work stays behind HTTP 402 until PayPal itself reports payment'],
     ];
-    return `<ul class="guard" aria-label="Guardrails">${items.map(([ok, t]) => `<li class="${ok ? '' : 'wait'}">${esc(t)}</li>`).join('')}</ul>`;
+    // Instructions the Scoper found hidden in the request: shown struck through, because none of them happened.
+    const ignored = job.log.find((l) => l.agent === 'Scoper' && l.message.startsWith('Ignored'));
+    const quotes = ignored ? [...ignored.message.matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+    const caught = quotes.length ? `<div class="caught"><b>Injection attempt caught · ${quotes.length} hidden instruction${quotes.length === 1 ? '' : 's'} ignored</b>
+      <ul>${quotes.map((q) => `<li>${esc(q)}</li>`).join('')}</ul>
+      <p>The quote stayed under the cap and the invoice can only go to ${esc(job.clientEmail)}. Code enforces this; the AI only reports it.</p></div>` : '';
+    return caught + `<ul class="guard" aria-label="Guardrails">${items.map(([ok, t]) => `<li class="${ok ? '' : 'wait'}">${esc(t)}</li>`).join('')}</ul>`;
   }
 
   // ---- Ledger (AG Grid) ----
