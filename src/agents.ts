@@ -85,7 +85,7 @@ async function withModel<T>(
 // A stuck AI call must fail visibly (the job shows the error and a retry button), never hang forever.
 const TIMEOUT = { scoper: 45_000, biller: 60_000, collector: 45_000, builder: 120_000 };
 // How long a model gets when another model is waiting behind it.
-const QUICK = { scoper: 15_000, biller: 25_000, collector: 15_000, builder: 45_000 };
+const QUICK = { scoper: 15_000, biller: 25_000, collector: 15_000, builder: 90_000 }; // a whole site takes a while
 
 // ---------------------------------------------------------------------------
 // 1. Scoper
