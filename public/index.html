@@ -594,7 +594,9 @@
       }
     }
     return `<div class="pay">
-      <div class="small">PayPal invoice <b>${esc(inv.id)}</b> · ${esc(inv.status)}</div>
+      <div class="small">${job.balanceInvoice
+        ? `PayPal invoices: deposit <b>${esc(inv.id)}</b> · balance <b>${esc(job.balanceInvoice.id)}</b>`
+        : `PayPal invoice <b>${esc(inv.id)}</b>`} · ${esc(inv.status)}</div>
       <div class="bar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i>${dep}</div>
       <div class="small">${line}</div>
       ${reminders ? `<div class="small">${reminders}</div>` : ''}
@@ -655,7 +657,7 @@
         source: j.source === 'agent' ? 'AI agent' : 'Dashboard', plan: j.deposit ? '50% deposit' : j.invoice ? 'In full' : '',
         status: j.status, total, paid, outstanding: open ? Math.max(0, total - paid) : 0, reminders: j.reminders || 0,
         timeToPay: j.paidAt && j.invoicedAt ? Date.parse(j.paidAt) - Date.parse(j.invoicedAt) : null,
-        invoice: j.invoice ? j.invoice.id : '',
+        invoice: j.invoice ? [j.invoice.id, j.balanceInvoice && j.balanceInvoice.id].filter(Boolean).join(' + ') : '',
       };
     });
   }
