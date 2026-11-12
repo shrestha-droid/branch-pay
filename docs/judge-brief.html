@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Branch Pay: judge brief</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* One US Letter page. Printed to docs/judge-brief.pdf with headless Chrome. Same identity as the app. */
+  @page { size: Letter; margin: 0; }
+  :root { --paper:#f1efe7; --card:#f8f6f0; --ink:#121826; --ink2:#3f4656; --ink3:#6f7685; --pen:#1f3fa0; --red:#b3261e; --green:#1f6b45; --rule:rgba(18,24,38,.22);
+    --display:'Fraunces',Georgia,serif; --sans:'Instrument Sans',sans-serif; --mono:'DM Mono',monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 8.5in; height: 11in; }
+  body { background: var(--paper); color: var(--ink); font: 400 8.5pt/1.36 var(--sans); padding: .38in .5in .3in .62in; position: relative;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body::before { content: ""; position: absolute; left: .4in; top: 0; bottom: 0; width: 1.2pt; background: rgba(179,38,30,.45); }
+  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.6pt solid var(--ink); padding-bottom: 6pt; }
+  .logo { display: flex; align-items: center; gap: 8pt; font: 500 8.5pt var(--mono); letter-spacing: .28em; white-space: nowrap; }
+  .mark { width: 20pt; height: 20pt; border: 1.4pt solid var(--ink); display: grid; place-items: center; font: italic 500 11pt var(--display); position: relative; }
+  .mark::after { content: ""; position: absolute; left: 3.5pt; top: -1pt; bottom: -1pt; width: 1pt; background: var(--red); }
+  .top .r { font: 500 6.6pt var(--mono); letter-spacing: .12em; white-space: nowrap; text-transform: uppercase; color: var(--ink2); }
+  .top .r b { color: var(--red); font-weight: 500; }
+  h1 { font: 350 24pt/1.02 var(--display); letter-spacing: -.035em; margin-top: 10pt; }
+  h1 em { font-style: italic; font-weight: 300; color: var(--pen); }
+  .lede { margin-top: 5pt; font-size: 9.6pt; color: var(--ink2); max-width: 5.7in; }
+  .links { display: grid; grid-template-columns: auto auto auto auto; justify-content: space-between; margin-top: 8pt; border-top: 1pt solid var(--rule); border-bottom: 1pt solid var(--rule); }
+  .links div { padding: 5pt 6pt 5pt 0; }
+  .links div + div { padding-left: 8pt; border-left: 1pt solid var(--rule); }
+  .k { display: block; font: 500 6.6pt var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--red); }
+  .links span:last-child { font: 400 6.5pt var(--mono); color: var(--ink); white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt 18pt; margin-top: 9pt; }
+  h2 { font: 500 7.2pt var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ink); border-bottom: 1pt solid var(--ink); padding-bottom: 3pt; margin-bottom: 5pt; }
+  h2 i { font-style: normal; color: var(--red); margin-right: 5pt; }
+  ol, ul { list-style: none; }
+  li { padding: 1.5pt 0; border-bottom: .6pt dotted var(--rule); }
+  ol { counter-reset: n; }
+  ol li { counter-increment: n; display: grid; grid-template-columns: 14pt 1fr; }
+  ol li::before { content: counter(n, decimal-leading-zero); font: 500 6.8pt var(--mono); color: var(--red); padding-top: 1.6pt; }
+  ul li { padding-left: 9pt; position: relative; }
+  ul li::before { content: "–"; position: absolute; left: 0; color: var(--ink3); }
+  b { font-weight: 600; }
+  code { font: 400 7.8pt var(--mono); color: var(--pen); }
+  .rule { margin-top: 9pt; background: var(--ink); color: var(--paper); padding: 8pt 12pt; display: flex; align-items: baseline; gap: 12pt; }
+  .rule .big { font: 350 15pt var(--display); letter-spacing: -.02em; white-space: nowrap; }
+  .rule .big em { color: #8ea2e6; font-weight: 300; }
+  .rule p { font-size: 8.4pt; color: rgba(241,239,231,.82); }
+  .stamp { position: absolute; right: .62in; top: 1.32in; transform: rotate(-9deg); border: 2pt solid var(--green); outline: 1pt solid var(--green); outline-offset: 2pt;
+    color: var(--green); font: 500 12pt/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; text-align: center; padding: 5pt 9pt 4pt; opacity: .9; }
+  .stamp small { display: block; font-size: 5.6pt; letter-spacing: .2em; margin-top: 2pt; }
+  .foot { position: absolute; left: .62in; right: .5in; bottom: .3in; display: flex; justify-content: space-between; font: 400 6.8pt var(--mono); color: var(--ink3); border-top: 1pt solid var(--rule); padding-top: 4pt; }
+</style></head><body>
+
+<div class="top">
+  <div class="logo"><span class="mark">B</span>BRANCH PAY</div>
+  <div class="r"><b>Judge brief</b> &nbsp;·&nbsp; PayPal AI Hackathon 2026 &nbsp;·&nbsp; Shrestha Pandey, Priyanshi Sharma</div>
+</div>
+<div class="stamp">Paid<small>Sandbox · verified</small></div>
+
+<h1>The work ships when the <em>invoice clears.</em></h1>
+<p class="lede">Four AI agents quote a job, bill it through real PayPal invoices, chase the payment, and release the work only when PayPal says it's paid. A client's own AI assistant can hire the agency over MCP. A person approves every money move.</p>
+
+<div class="links">
+  <div><span class="k">Live demo</span><span>branch-pay.onrender.com</span></div>
+  <div><span class="k">Code (MIT)</span><span>github.com/shrestha-droid/branch-pay</span></div>
+  <div><span class="k">Video, 2:13</span><span>youtube.com/watch?v=xjuUCSi5NvY</span></div>
+  <div><span class="k">Devpost</span><span>devpost.com/software/branch-pay</span></div>
+</div>
+
+<div class="grid">
+  <section>
+    <h2><i>01</i>Try it in two minutes · no login</h2>
+    <ol>
+      <li><span><b>Fill example</b>, any name and an <code>@example.com</code> email, <b>Get a quote</b>. The Scoper prices it under a hard cap.</span></li>
+      <li><span><b>Approve · 50% deposit first</b>. Real PayPal sandbox invoices are created and sent; their ids show on the job.</span></li>
+      <li><span><b>Send reminder now</b>. The Collector writes it; PayPal's remind API sends it.</span></li>
+      <li><span><b>Demo: pay deposit</b>, then watch the watermarked preview appear. <b>Demo: pay balance</b> unlocks <b>Download</b>.</span></li>
+      <li><span><b>Try a prompt injection</b>. Hidden instructions are listed, struck through and ignored.</span></li>
+      <li><span><b>Ledger</b> tab (AG Grid), <b>AI agents</b> tab (MCP URL), then <b>Refund</b>.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><i>02</i>The loop</h2>
+    <ol>
+      <li><span><b>Scoper</b> (Gemini, structured output): request → fixed-price quote, capped in code, plus a list of injected instructions it ignored.</span></li>
+      <li><span><b>A person approves</b>: in full, or a 50% deposit first. Nothing reaches PayPal before this.</span></li>
+      <li><span><b>Biller</b> (tool calling): one forced call drafts the invoice; the code sends it.</span></li>
+      <li><span><b>Collector</b>: reminders on a schedule, at most three, through PayPal.</span></li>
+      <li><span><b>Builder</b>: starts when PayPal reports payment. Deposit → watermarked preview; balance → final files.</span></li>
+      <li><span>Until then the work answers <b>HTTP 402 Payment Required</b> with a machine-readable PayPal pay link.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><i>03</i>PayPal · 10 endpoints, hand-written REST</h2>
+    <ul>
+      <li><b>Invoicing v2</b>: create, send, get, remind, cancel, record payment, record refund.</li>
+      <li><b>Payments v2</b>: refund a capture. <b>Webhooks</b>: signature verification. <b>OAuth 2.0</b>.</li>
+      <li>Deposit plans use partial payments, or a deposit invoice plus a balance invoice where the merchant's country doesn't allow them (ours didn't).</li>
+      <li>The job id is the <code>PayPal-Request-Id</code>, so retries never double-invoice.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><i>04</i>AI and agentic commerce</h2>
+    <ul>
+      <li><b>Gemini</b> via the Vercel AI SDK: <code>gemini-flash-latest</code> → <code>flash-lite-latest</code> → <code>3.8-flash</code>, with timeouts and a rest period for busy models.</li>
+      <li><b>MCP server</b> (official TypeScript SDK): <code>request_quote</code>, <code>get_job</code>, <code>list_jobs</code>. A buyer's AI can ask and track; it has no tool to approve, pay, cancel or refund.</li>
+      <li>Failed builds retry on their own, up to five times.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><i>05</i>Safety by design</h2>
+    <ul>
+      <li>Amounts and recipient come from the <b>approved quote in server state</b>, never from model output (CaMeL, arXiv 2503.18813).</li>
+      <li>Untrusted text can't trigger consequential actions (arXiv 2506.08837).</li>
+      <li>Refund and cancel have <b>no AI tool</b>. Webhooks only trigger a fresh read from PayPal.</li>
+      <li>Builder HTML runs in a sandboxed iframe under a strict CSP.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><i>06</i>Sponsor tools · verified</h2>
+    <ul>
+      <li><b>AG Grid</b>: the receivables desk. Quick views, aging buckets, pinned totals that follow filters, bulk <b>Remind selected</b>, CSV export, themed.</li>
+      <li><b>Render</b>: one-click Blueprint (<code>render.yaml</code>), auto-deploy from <code>main</code>, health check.</li>
+      <li><b>10 of 10</b> tests pass (<code>npm test</code>). Whole flow run on the live sandbox, Nov 12, 2026.</li>
+    </ul>
+  </section>
+</div>
+
+<div class="rule">
+  <div class="big">The AI proposes. The code enforces. <em>People approve.</em></div>
+  <p>Agents do the work around the money: scoping, writing, chasing, building. The money itself belongs to code and people.</p>
+</div>
+
+<div class="foot"><span>PayPal sandbox only · no real money moves</span><span>MIT licensed · README has setup steps for running it locally</span></div>
+</body></html>
