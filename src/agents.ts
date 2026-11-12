@@ -243,52 +243,41 @@ export async function runBiller(job: Job): Promise<BillingResult> {
         return { invoiceId, status: 'DRAFT', total: quote.total };
       },
     }),
-
-    send_invoice: tool({
-      // No inputs: it can only send the invoice this job just created, so there is nothing to get wrong or redirect.
-      description: 'Send the draft invoice you just created to the client.',
-      inputSchema: z.object({}),
-      execute: async () => {
-        if (!invoiceId) return { error: 'Create the invoice first.' };
-        if (sent) return { error: 'Invoice already sent.' };
-        for (const id of balanceId ? [invoiceId, balanceId] : [invoiceId]) {
-          try {
-            await sendInvoice(id);
-          } catch (err) {
-            // On a retry, create_invoice returns the same invoice (idempotency key), which may already be sent.
-            const current = await getInvoice(id).catch(recordError);
-            if (current.status === 'DRAFT') recordError(err);
-          }
-        }
-        sent = true;
-        addLog(job, 'Biller', `Sent ${balanceId ? `invoices ${invoiceId} and ${balanceId}` : `invoice ${invoiceId}`} to ${job.clientEmail}.`);
-        return { invoiceId, status: 'SENT' };
-      },
-    }),
   };
 
   addLog(job, 'Biller', 'Preparing the PayPal invoice...');
+  // One AI step: the model must call create_invoice and only fills in the note and payment terms.
+  // Sending takes no judgement, so the code does it: half the AI requests, and a slow model can't strand a draft.
   await withModel((model, timeout) => generateText({
     timeout,
     maxRetries: 1,
     model,
     tools,
-    // Two steps and no closing summary: the summary was never shown, and every step is an AI request.
-    stopWhen: stepCountIs(2),
-    // Plan-then-execute: the code fixes the order (create, then send).
-    // The model only fills in the note and payment terms, so even a lazy model can't skip a step.
-    prepareStep: ({ stepNumber }) => ({
-      toolChoice: { type: 'tool' as const, toolName: stepNumber === 0 ? ('create_invoice' as const) : ('send_invoice' as const) },
-    }),
-    system:
-      'You are the Biller at a small digital agency. Bill the client for the approved quote using your tools: ' +
-      'first create_invoice, then send_invoice.',
+    stopWhen: stepCountIs(1),
+    toolChoice: { type: 'tool', toolName: 'create_invoice' },
+    system: 'You are the Biller at a small digital agency. Bill the client for the approved quote with create_invoice.',
     prompt:
       `Approved quote "${quote.title}" for ${job.clientName}, total $${quote.total.toFixed(2)} ${quote.currency}. ${quote.summary}` +
       (job.deposit
         ? ` Payment plan: the client may pay a $${job.deposit.toFixed(2)} deposit first to unlock a preview, then the balance for the final files. Mention this in the note.`
         : ''),
-  }), TIMEOUT.biller, QUICK.biller);
+  }), TIMEOUT.biller, QUICK.biller).catch((err) => {
+    if (!invoiceId) throw err; // the draft exists, so a model that hung afterwards doesn't matter
+  });
+
+  if (invoiceId) {
+    for (const id of balanceId ? [invoiceId, balanceId] : [invoiceId]) {
+      try {
+        await sendInvoice(id);
+      } catch (err) {
+        // On a retry, create_invoice returns the same invoice (idempotency key), which may already be sent.
+        const current = await getInvoice(id).catch(recordError);
+        if (current.status === 'DRAFT') recordError(err);
+      }
+    }
+    sent = true;
+    addLog(job, 'Biller', `Sent ${balanceId ? `invoices ${invoiceId} and ${balanceId}` : `invoice ${invoiceId}`} to ${job.clientEmail}.`);
+  }
 
   if (!invoiceId || !sent) {
     const why = toolError ? ` PayPal said: ${toolError}` : '';
