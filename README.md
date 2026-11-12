@@ -8,6 +8,29 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). San
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/shrestha-droid/branch-pay)
 
+![Branch Pay: the work ships when the invoice clears](docs/cover.png)
+
+## Try it in two minutes (for judges)
+
+1. Open **<https://branch-pay.onrender.com>** and wait for it to wake up (up to a minute on the free plan).
+2. Click **Fill example**, type any email (a PayPal sandbox buyer email if you have one), and press **Get a quote**. The Scoper prices it in a few seconds.
+3. Press **Approve · 50% deposit first**. The Biller creates and sends real PayPal sandbox invoices; their ids appear on the job.
+4. Press **Demo: pay deposit**. PayPal records the payment, the Builder writes a website, and a watermarked preview appears. Press **Demo: pay balance** to unlock the final files and **Download**.
+5. Press **Refund**: the money goes back through PayPal and the work answers HTTP 402 again.
+6. Click **Try a prompt injection** and get a quote: the injected instructions are caught and struck through, and the price cap holds.
+7. Open **AI agents** to connect Claude (or the MCP Inspector) and let an AI assistant request a quote.
+
+Each browser gets its own private workspace, so you only see your own jobs. "Demo: pay" records a sandbox payment as the merchant, so you don't need a PayPal buyer login.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![A job on the deposit plan: rubber-stamp status, agent rail, line items, both PayPal invoices](docs/gallery/2-job.jpg) | ![Prompt injection caught: four hidden instructions struck through](docs/gallery/5-prompt-injection.jpg) |
+| **A job on the deposit plan.** Status stamp, which agent is working, both PayPal invoices, and the guardrails. | **A prompt injection, caught.** The price cap held and the recipient couldn't change. |
+| ![The website the Builder made, watermarked until the balance is paid](docs/gallery/4-deliverable.jpg) | ![The AG Grid ledger](docs/gallery/6-ledger.jpg) |
+| **The Builder's website,** watermarked until the balance is paid. | **The ledger** (AG Grid): every quote, invoice and payment. |
+
 ## The problem
 
 Freelancers and small agencies don't lose money on the work. They lose it on the loop around the work: writing the quote, sending the invoice, chasing late payments, and deciding when it's safe to hand over the files. Hand over too early and you might never get paid; hold on too long and the client walks.

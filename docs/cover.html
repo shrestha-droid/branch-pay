@@ -1,27 +1,72 @@
-<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box;margin:0}
-body{width:1500px;height:1000px;background:radial-gradient(1200px 700px at 85% 0%,#0f2a5c 0%,#0a0f1a 60%);color:#e8eef8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:90px 100px;display:flex;flex-direction:column}
-.logo{display:flex;align-items:center;gap:18px;font-size:34px;font-weight:700}
-.mark{width:58px;height:58px;border-radius:14px;background:linear-gradient(135deg,#003087,#0070e0 60%,#009cde);display:grid;place-items:center;font-weight:800;font-size:30px}
-h1{font-size:84px;line-height:1.02;letter-spacing:-.025em;margin-top:70px;max-width:1150px}
-h1 em{font-style:normal;color:#4da3ff}
-p{font-size:30px;color:#8e9bb3;margin-top:28px;max-width:1100px;line-height:1.35}
-.flow{display:flex;gap:14px;margin-top:auto;align-items:center;flex-wrap:nowrap}
-.a{background:#121a2a;border:1px solid #223049;border-radius:14px;padding:16px 20px;font-size:22px;font-weight:600;white-space:nowrap}
-.a small{display:block;font-size:15px;font-weight:500;color:#8e9bb3;margin-top:3px}
-.s{color:#7c3aed}.b{color:#4da3ff}.c{color:#f59e0b}.u{color:#22c55e}
-.arrow{color:#3a4a68;font-size:26px}
-.code{font-family:ui-monospace,Menlo,monospace;background:#003087;color:#fff;border-radius:999px;padding:8px 18px;font-size:20px;font-weight:600}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Devpost cover, 1500x1000 (3:2). Same identity as the app: ledger paper, ink, pen blue, margin red. */
+  :root { --paper:#f1efe7; --card:#f8f6f0; --ink:#121826; --ink2:#3f4656; --ink3:#6f7685; --pen:#1f3fa0; --red:#b3261e; --green:#1f6b45; --rule:rgba(18,24,38,.26); --ledger:rgba(31,63,160,.07);
+    --display:'Fraunces',Georgia,serif; --sans:'Instrument Sans',sans-serif; --mono:'DM Mono',monospace; }
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1500px; height: 1000px; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--sans); display: grid; grid-template-rows: auto 1fr auto; }
+  .ticker { background: var(--ink); color: rgba(241,239,231,.75); font: 500 13px var(--mono); letter-spacing: .22em; text-transform: uppercase; padding: 12px 80px; white-space: nowrap; overflow: hidden; }
+  .ticker span { color: #8ea2e6; margin: 0 22px; }
+  .main { display: grid; grid-template-columns: 1fr 560px; gap: 70px; align-items: center; padding: 0 80px; }
+  .logo { display: flex; align-items: center; gap: 14px; font: 500 15px var(--mono); letter-spacing: .3em; }
+  .mark { width: 40px; height: 40px; border: 2px solid var(--ink); display: grid; place-items: center; font: italic 500 21px var(--display); position: relative; }
+  .mark::after { content: ""; position: absolute; left: 7px; top: -2px; bottom: -2px; width: 1.5px; background: var(--red); }
+  .kicker { margin-top: 44px; font: 500 14px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ink2); }
+  .kicker b { color: var(--red); font-weight: 500; }
+  h1 { font: 350 104px/.98 var(--display); font-variation-settings: "opsz" 144; letter-spacing: -.04em; margin-top: 22px; }
+  h1 em { font-style: italic; font-weight: 300; color: var(--pen); }
+  .sub { margin-top: 28px; font-size: 23px; line-height: 1.45; color: var(--ink2); max-width: 680px; }
+  .sheet { position: relative; background: var(--card); border: 1px solid var(--rule); padding: 44px 40px 32px 52px; transform: rotate(1.4deg);
+    box-shadow: 0 30px 60px -30px rgba(18,24,38,.5), 10px 10px 0 -1px #e8e5da, 10px 10px 0 0 var(--rule);
+    background-image: linear-gradient(var(--ledger) 1px, transparent 1px); background-size: 100% 34px; background-position: 0 17px; }
+  .sheet::before { content: ""; position: absolute; left: 30px; top: 0; bottom: 0; width: 1.5px; background: rgba(179,38,30,.45); }
+  .head { display: flex; justify-content: space-between; border-bottom: 2px solid var(--ink); padding-bottom: 10px; font: 500 14px var(--mono); letter-spacing: .3em; }
+  .head span:last-child { color: var(--red); letter-spacing: .05em; }
+  .sheet h2 { font: 400 40px/1.1 var(--display); letter-spacing: -.02em; margin-top: 20px; }
+  .to { font: 400 15px var(--mono); color: var(--ink3); margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 19px; }
+  td { padding: 10px 0; border-top: 1px dotted var(--rule); }
+  td:last-child { text-align: right; font: 400 17px var(--mono); }
+  .sum td { border-top: 2px solid var(--ink); padding-top: 14px; }
+  .sum td:first-child { font: 500 14px var(--mono); letter-spacing: .22em; }
+  .sum td:last-child { font: 400 36px var(--display); text-decoration: underline double; text-underline-offset: 8px; text-decoration-thickness: 1px; }
+  .stamp { position: absolute; right: 40px; top: 205px; transform: rotate(-11deg); border: 3px solid var(--green); border-radius: 5px; outline: 1.5px solid var(--green); outline-offset: 3px;
+    color: var(--green); font: 500 30px/1.05 var(--mono); letter-spacing: .16em; text-transform: uppercase; text-align: center; padding: 12px 20px 10px; mix-blend-mode: multiply; opacity: .9; }
+  .stamp small { display: block; font-size: 13px; letter-spacing: .22em; margin-top: 4px; }
+  .foot { display: flex; gap: 0; border-top: 2px solid var(--ink); margin: 0 80px 56px; }
+  .foot div { flex: 1; padding: 16px 20px 0 0; }
+  .foot div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
+  .foot b { display: block; font: 500 12px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--red); }
+  .foot span { font: 400 22px var(--display); }
 </style></head><body>
-<div class="logo"><div class="mark">B</div>Branch Pay</div>
-<h1>AI agents that <em>get you paid</em>, then deliver the work.</h1>
-<p>Quote, PayPal invoice, reminders, deposit, delivery and refund, run by four agents. People approve every money move. Your clients' AI assistants can hire you over MCP.</p>
-<div class="flow">
-  <div class="a s">Scoper<small>prices the job</small></div><span class="arrow">→</span>
-  <div class="a">You approve<small>full or 50% deposit</small></div><span class="arrow">→</span>
-  <div class="a b">Biller<small>PayPal invoice</small></div><span class="arrow">→</span>
-  <div class="a c">Collector<small>chases payment</small></div><span class="arrow">→</span>
-  <div class="a u">Builder<small>delivers when paid</small></div>
-  <span class="code">HTTP 402</span>
+<div class="ticker">Accounts receivable, run by agents<span>·</span>HTTP 402 · payment required<span>·</span>People approve every money move<span>·</span>Settled through PayPal</div>
+<div class="main">
+  <div>
+    <div class="logo"><span class="mark">B</span>BRANCH PAY</div>
+    <p class="kicker"><b>Nº 402</b> &nbsp;·&nbsp; PayPal AI Hackathon</p>
+    <h1>The work ships when the <em>invoice clears.</em></h1>
+    <p class="sub">Four AI agents quote the job, send a real PayPal invoice, chase the payment, and release the work only when PayPal says it's paid. Your clients' AI assistants can hire you too.</p>
+  </div>
+  <div class="sheet">
+    <div class="head"><span>INVOICE</span><span>Nº BP-0042</span></div>
+    <h2>The Daily Crust website</h2>
+    <div class="to">Bill to: Rosa Martinez · via PayPal</div>
+    <table>
+      <tr><td>One-page web design</td><td>$150.00</td></tr>
+      <tr><td>Menu &amp; hours section</td><td>$120.00</td></tr>
+      <tr><td>Cake pre-order form</td><td>$180.00</td></tr>
+      <tr class="sum"><td>TOTAL</td><td>$450.00</td></tr>
+    </table>
+    <div class="stamp">Paid<small>In full · delivered</small></div>
+  </div>
+</div>
+<div class="foot">
+  <div><b>01 Scoper</b><span>prices the job</span></div>
+  <div><b>02 You</b><span>approve</span></div>
+  <div><b>03 Biller</b><span>invoices via PayPal</span></div>
+  <div><b>04 Collector</b><span>chases payment</span></div>
+  <div><b>05 Builder</b><span>ships when paid</span></div>
 </div>
 </body></html>

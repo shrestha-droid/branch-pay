@@ -243,7 +243,7 @@
 
   .toolbar { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; }
   .toolbar input { width: auto; flex: 1; min-width: 200px; }
-  #grid { height: 560px; margin-top: 1rem; }
+  #grid { margin-top: 1rem; }
   pre { background: var(--paper-2); border: 1px solid var(--rule-2); padding: .7rem .9rem; overflow-x: auto; font: 400 12.5px var(--mono); margin: .5rem 0 0; }
   blockquote { margin: .6rem 0 0; padding: .3rem 0 .3rem 1.1rem; border-left: 2px solid var(--pen); font: 400 1.25rem/1.4 var(--display); font-style: italic; color: var(--ink-2); }
   h3 { font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; margin: 1.5rem 0 .3rem; }
@@ -691,6 +691,7 @@
     grid = agGrid.createGrid($('grid'), {
       theme,
       rowData: rows,
+      domLayout: 'autoHeight', // a ledger grows with its entries; no empty box under a few rows
       pinnedBottomRowData: ledgerTotals(rows),
       getRowId: (p) => p.data.id,
       defaultColDef: { sortable: true, resizable: true, filter: true },
