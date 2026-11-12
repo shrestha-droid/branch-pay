@@ -47,7 +47,7 @@ The **Ledger** (AG Grid) is the receivables desk: quick views for what's awaitin
 
 We built on two 2025 papers on securing LLM agents. [*Design Patterns for Securing LLM Agents against Prompt Injections*](https://arxiv.org/abs/2506.08837) argues that once an agent has read untrusted input, that input must not be able to trigger consequential actions. [*Defeating Prompt Injections by Design*](https://arxiv.org/abs/2503.18813) (CaMeL) separates control flow from data flow. In Branch Pay:
 
-- The Biller follows **plan-then-execute** with a fixed tool sequence. Its tools take only a note and payment terms. **Amounts, deposit and recipient flow from the approved quote in server state**, so nothing the model reads can redirect money, whether that's a client's text, a buyer agent's request, or an injection.
+- The Biller follows **plan-then-execute**: one forced tool call drafts the invoice, then the code sends it. Its tool takes only a note and payment terms. **Amounts, deposit and recipient flow from the approved quote in server state**, so nothing the model reads can redirect money, whether that's a client's text, a buyer agent's request, or an injection.
 - The Scoper reads untrusted text, but its output is **clamped by code and approved by a human** before anything happens.
 - The Builder gets **context minimization**: it sees the request, has no tools, and its HTML is served under a strict Content-Security-Policy in a sandboxed iframe.
 - **Refund and cancel have no AI tool at all.**
@@ -62,7 +62,7 @@ We built on two 2025 papers on securing LLM agents. [*Design Patterns for Securi
 - **Letting outside agents in safely.** Giving buyers' AI agents an MCP interface meant deciding exactly what they may do. They can ask and look; only people approve, pay and refund.
 - **Public demo hygiene.** A hosted demo needs per-visitor workspaces and rate limits on AI calls, so judges don't see each other's jobs and nobody can burn the quota.
 - **Overloaded models.** On the live site the main Gemini model often answered "high demand" or hung, and a quote once took 47 seconds. Each agent now gives a model a short first try, falls back to the next model, and rests a failing model for 15 minutes. Quotes came down to 2 to 5 seconds.
-- **Our own bugs, found live.** Testing on the real PayPal sandbox caught an invoice field PayPal rejected and a lighter model that answered in text instead of calling its tools. The second one led us to fix the Biller's tool order in code, which is also the safer design.
+- **Our own bugs, found live.** Testing on the real PayPal sandbox caught an invoice field PayPal rejected and a lighter model that answered in text instead of calling its tools. The second one led us to fix the Biller's tool order in code, and on the night of the deadline an overloaded model stranding drafted invoices led us to cut the Biller to a single AI step, with the code doing the send.
 
 ## Accomplishments that we're proud of
 
