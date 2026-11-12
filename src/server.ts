@@ -2,7 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { join } from 'node:path';
 import { z } from 'zod';
 import { config, geminiConfigured, paypalConfigured } from './config.js';
-import { MODELS, pingModel, runBiller, runBuilder, runCollector, runScoper } from './agents.js';
+import { modelHealth, runBiller, runBuilder, runCollector, runScoper } from './agents.js';
 import { handleMcp } from './mcp.js';
 import { cancelInvoice, getAccessToken, getInvoice, recordPayment, refundInvoice, verifyWebhook } from './paypal.js';
 import {
@@ -93,24 +93,15 @@ app.get('/api/config', (_req, res) => {
   });
 });
 
-// Live check of both outside services, for judges and for debugging a deploy.
-// Cached for 30 seconds so it can't be used to burn the AI quota.
-let health: { at: number; body: unknown } | null = null;
+// Status of both outside services, for judges and for debugging a deploy. It never spends an AI request:
+// PayPal is checked with the cached login token, and each Gemini model reports its last real agent call.
 app.get('/api/health', async (_req, res) => {
-  if (!health || Date.now() - health.at > 30_000) {
-    const check = async (run: () => Promise<unknown>) => {
-      const started = Date.now();
-      try {
-        await run();
-        return { ok: true, ms: Date.now() - started };
-      } catch (err) {
-        return { ok: false, ms: Date.now() - started, error: errorMessage(err) };
-      }
-    };
-    const [paypal, ...gemini] = await Promise.all([check(getAccessToken), ...MODELS.map((id) => check(() => pingModel(id)))]);
-    health = { at: Date.now(), body: { paypal, gemini: MODELS.map((model, i) => ({ model, ...gemini[i] })) } };
-  }
-  res.json(health.body);
+  const started = Date.now();
+  const paypal = await getAccessToken().then(
+    () => ({ ok: true, ms: Date.now() - started }),
+    (err) => ({ ok: false, ms: Date.now() - started, error: errorMessage(err) }),
+  );
+  res.json({ paypal, gemini: modelHealth() });
 });
 
 app.get('/api/jobs', (req, res) => {

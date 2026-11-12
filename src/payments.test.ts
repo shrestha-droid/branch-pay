@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { restMs } from './agents.js';
 import { combineInvoices, depositFor, invoiceToChase, paymentEvent, reminderDue } from './store.js';
 
 const inv = (o: Partial<{ paid: boolean; cancelled: boolean; paidAmount: number }> = {}) => ({
@@ -76,4 +77,11 @@ test('reminders chase the right invoice', () => {
   assert.equal(invoiceToChase({ ...pair, invoice: { id: 'D', status: 'SENT', paid: 225 } }), 'B');
   assert.equal(invoiceToChase({ deposit: 225, invoice: { id: 'ONE', status: 'PARTIALLY_PAID', paid: 225 } }), 'ONE');
   assert.equal(invoiceToChase({ invoice: { id: 'ONE', status: 'SENT', paid: 0 } }), 'ONE');
+});
+
+test('a model over its quota rests until Gemini says to retry', () => {
+  assert.equal(restMs('Quota exceeded. Please retry in 2h33m25.3s.'), Math.round((2 * 3600 + 33 * 60 + 25.3) * 1000));
+  assert.equal(restMs('Please retry in 41s.'), 15 * 60_000); // never shorter than the normal rest
+  assert.equal(restMs('This model is currently experiencing high demand.'), 15 * 60_000);
+  assert.equal(restMs('Please retry in 99h0m0s.'), 24 * 3_600_000); // capped at a day
 });

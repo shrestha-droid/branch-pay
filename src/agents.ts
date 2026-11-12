@@ -30,6 +30,23 @@ const tryNext = (err: unknown) =>
 const resting = new Map<string, number>();
 const REST_MS = 15 * 60_000;
 
+/** Gemini's quota errors say when to come back ("Please retry in 2h33m25s"). Rest the model until then. */
+export function restMs(message: string): number {
+  const m = /retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i.exec(message);
+  const hinted = m ? (Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0)) * 1000 : 0;
+  return Math.min(Math.max(hinted, REST_MS), 24 * 3_600_000);
+}
+
+// What each model did the last time an agent really used it. The health page reads this, so checking
+// health never spends an AI request.
+const lastResult = new Map<string, { ok: boolean; at: string; error?: string }>();
+export const modelHealth = () =>
+  MODELS.map((model) => ({
+    model,
+    ...(lastResult.get(model) ?? { ok: null, note: 'not used since the server started' }),
+    restingUntil: (resting.get(model) ?? 0) > Date.now() ? new Date(resting.get(model)!).toISOString() : undefined,
+  }));
+
 /**
  * Runs an agent call on the first model that answers. When another model is waiting behind it, the first one
  * gets a short try (`quickMs`): a busy model then costs seconds, not the whole timeout, and rests for 15 minutes.
@@ -44,13 +61,21 @@ async function withModel<T>(
   let last: unknown;
   for (const [i, id] of order.entries()) {
     try {
-      return await call(google(id), i < order.length - 1 ? quickMs : timeoutMs);
+      const result = await call(google(id), i < order.length - 1 ? quickMs : timeoutMs);
+      lastResult.set(id, { ok: true, at: new Date().toISOString() });
+      return result;
     } catch (err) {
       last = err;
+      const message = err instanceof Error ? err.message : String(err);
+      lastResult.set(id, { ok: false, at: new Date().toISOString(), error: message.slice(0, 300) });
       if (!tryNext(err)) throw err;
-      resting.set(id, Date.now() + REST_MS);
-      console.warn(`Gemini model ${id} failed, resting it for 15 minutes: ${err instanceof Error ? err.message : err}`);
+      const rest = restMs(message);
+      resting.set(id, Date.now() + rest);
+      console.warn(`Gemini model ${id} failed, resting it for ${Math.round(rest / 60_000)} minutes: ${message}`);
     }
+  }
+  if (/quota|rate limit|exhausted/i.test(last instanceof Error ? last.message : String(last))) {
+    throw new Error('The AI models are over their usage limit right now. Please try again in a little while.');
   }
   throw last;
 }
@@ -59,11 +84,6 @@ async function withModel<T>(
 const TIMEOUT = { scoper: 45_000, biller: 60_000, collector: 45_000, builder: 120_000 };
 // How long a model gets when another model is waiting behind it.
 const QUICK = { scoper: 15_000, biller: 25_000, collector: 15_000, builder: 45_000 };
-
-/** Smallest possible model call, no retries, so a health check shows the real error fast. */
-export async function pingModel(id: string): Promise<void> {
-  await generateText({ model: google(id), prompt: 'Reply with the single word OK.', timeout: 30_000, maxRetries: 0 });
-}
 
 // ---------------------------------------------------------------------------
 // 1. Scoper
@@ -251,20 +271,16 @@ export async function runBiller(job: Job): Promise<BillingResult> {
     maxRetries: 1,
     model,
     tools,
-    stopWhen: stepCountIs(3),
-    // Plan-then-execute: the code fixes the order (create, then send, then a one-line summary).
+    // Two steps and no closing summary: the summary was never shown, and every step is an AI request.
+    stopWhen: stepCountIs(2),
+    // Plan-then-execute: the code fixes the order (create, then send).
     // The model only fills in the note and payment terms, so even a lazy model can't skip a step.
     prepareStep: ({ stepNumber }) => ({
-      toolChoice:
-        stepNumber === 0
-          ? { type: 'tool' as const, toolName: 'create_invoice' as const }
-          : stepNumber === 1
-            ? { type: 'tool' as const, toolName: 'send_invoice' as const }
-            : ('none' as const),
+      toolChoice: { type: 'tool' as const, toolName: stepNumber === 0 ? ('create_invoice' as const) : ('send_invoice' as const) },
     }),
     system:
       'You are the Biller at a small digital agency. Bill the client for the approved quote using your tools: ' +
-      'first create_invoice, then send_invoice. Then reply with one short sentence.',
+      'first create_invoice, then send_invoice.',
     prompt:
       `Approved quote "${quote.title}" for ${job.clientName}, total $${quote.total.toFixed(2)} ${quote.currency}. ${quote.summary}` +
       (job.deposit

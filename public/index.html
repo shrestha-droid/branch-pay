@@ -256,6 +256,14 @@
 
   .toolbar { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; }
   .toolbar input { width: auto; flex: 1; min-width: 200px; }
+  .chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  button.chip { padding: .4rem .7rem; font-size: 11px; letter-spacing: .08em; background: transparent; color: var(--ink-2); border-color: var(--rule-2); box-shadow: none; }
+  button.chip:hover, button.chip:active { transform: none; box-shadow: none; background: var(--paper-2); }
+  button.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  button.chip b { font-weight: 500; opacity: .65; margin-left: .35rem; }
+  .ag-cell.owed { color: var(--red); font-weight: 500; }
+  .ag-cell.settled { color: var(--green); }
+  .ag-row-pinned { font-weight: 600; }
   #grid { margin-top: 1rem; }
   pre { background: var(--paper-2); border: 1px solid var(--rule-2); padding: .7rem .9rem; overflow-x: auto; font: 400 12.5px var(--mono); margin: .5rem 0 0; }
   blockquote { margin: .6rem 0 0; padding: .3rem 0 .3rem 1.1rem; border-left: 2px solid var(--pen); font: 400 1.25rem/1.4 var(--display); font-style: italic; color: var(--ink-2); }
@@ -394,8 +402,16 @@
   <section class="view" id="view-ledger" hidden>
     <div class="card">
       <h2>Ledger <span class="eyebrow">every quote, invoice and payment</span></h2>
+      <div class="chips" id="chips" role="group" aria-label="Filter the ledger">
+        <button class="chip" type="button" data-f="all" aria-pressed="true">All<b></b></button>
+        <button class="chip" type="button" data-f="approval" aria-pressed="false">Awaiting approval<b></b></button>
+        <button class="chip" type="button" data-f="open" aria-pressed="false">Awaiting payment<b></b></button>
+        <button class="chip" type="button" data-f="paid" aria-pressed="false">Paid<b></b></button>
+        <button class="chip" type="button" data-f="agent" aria-pressed="false">Via AI agent<b></b></button>
+      </div>
       <div class="toolbar">
         <input id="gridFilter" type="search" placeholder="Search clients, projects, invoice ids..." aria-label="Search the ledger">
+        <button type="button" id="remindSel" disabled title="Tick unpaid rows, then let the Collector agent write each client a reminder">Remind selected</button>
         <button class="secondary" type="button" id="exportCsv">Export CSV</button>
       </div>
       <div id="grid"></div>
@@ -670,7 +686,6 @@
 
   // ---- Ledger (AG Grid) ----
   let grid = null;
-  const pill = (status) => (status ? `<span class="status s-${esc(status)}">${esc(LABEL[status] || status)}</span>` : '');
   function ledgerRows() {
     return state.jobs.map((j) => {
       const total = j.quote ? j.quote.total : 0;
@@ -678,9 +693,10 @@
       const open = j.status === 'invoiced' || j.status === 'preview';
       return {
         id: j.id, created: j.createdAt, client: j.clientName, project: j.quote ? j.quote.title : '(no quote)',
-        source: j.source === 'agent' ? 'AI agent' : 'Dashboard', plan: j.deposit ? '50% deposit' : j.invoice ? 'In full' : '',
+        source: j.source === 'agent' ? 'AI agent' : 'Direct', plan: j.deposit ? '50% deposit' : j.invoice ? 'In full' : '',
         status: j.status, total, paid, outstanding: open ? Math.max(0, total - paid) : 0, reminders: j.reminders || 0,
         timeToPay: j.paidAt && j.invoicedAt ? Date.parse(j.paidAt) - Date.parse(j.invoicedAt) : null,
+        waiting: open && j.dueSince ? Date.now() - Date.parse(j.dueSince) : null,
         invoice: j.invoice ? [j.invoice.id, j.balanceInvoice && j.balanceInvoice.id].filter(Boolean).join(' + ') : '',
       };
     });
@@ -688,6 +704,33 @@
   function ledgerTotals(rows) {
     const sum = (k) => rows.reduce((a, r) => a + (r.status === 'cancelled' ? 0 : r[k]), 0);
     return [{ id: 'totals', client: `${rows.length} job${rows.length === 1 ? '' : 's'}`, total: sum('total'), paid: sum('paid'), outstanding: sum('outstanding') }];
+  }
+  // Quick views of the book. The totals row follows whichever view and filters are on.
+  const VIEWS = {
+    all: () => true,
+    approval: (r) => r.status === 'quoted',
+    open: (r) => r.status === 'invoiced' || r.status === 'preview',
+    paid: (r) => ['paid', 'delivering', 'delivered'].includes(r.status),
+    agent: (r) => r.source === 'AI agent',
+  };
+  let ledgerView = 'all', lastTotals = '';
+  const SHORT = { quoted: 'to approve', invoiced: 'unpaid', preview: 'balance due' }; // short labels for narrow cells
+  const canRemind = (r) => !!r && VIEWS.open(r) && r.reminders < state.cfg.maxReminders;
+  // Accounts-receivable aging: how long the amount owed has been waiting.
+  const aging = (ms) => (ms == null ? '' : ms < 86400000 ? 'Today' : ms < 7 * 86400000 ? '1 to 7 days' : 'Over 7 days');
+  function refreshTotals() {
+    if (!grid) return; // fires once while the grid is still being created
+    const shown = [];
+    grid.forEachNodeAfterFilter((n) => n.data && shown.push(n.data));
+    const totals = ledgerTotals(shown), key = JSON.stringify(totals);
+    if (key !== lastTotals) { lastTotals = key; grid.setGridOption('pinnedBottomRowData', totals); }
+  }
+  function renderChips() {
+    const rows = ledgerRows();
+    document.querySelectorAll('#chips .chip').forEach((c) => {
+      c.setAttribute('aria-pressed', String(c.dataset.f === ledgerView));
+      c.querySelector('b').textContent = rows.filter(VIEWS[c.dataset.f]).length;
+    });
   }
   function initGrid() {
     if (grid || !window.agGrid) return;
@@ -705,38 +748,57 @@
       theme,
       rowData: rows,
       domLayout: 'autoHeight', // a ledger grows with its entries; no empty box under a few rows
-      pinnedBottomRowData: ledgerTotals(rows),
       getRowId: (p) => p.data.id,
       defaultColDef: { sortable: true, resizable: true, filter: true },
+      // Tick unpaid rows to chase several clients at once. Only rows that can still be reminded get a box.
+      rowSelection: { mode: 'multiRow', isRowSelectable: (n) => canRemind(n.data), hideDisabledCheckboxes: true, enableClickSelection: false },
+      isExternalFilterPresent: () => ledgerView !== 'all',
+      doesExternalFilterPass: (n) => VIEWS[ledgerView](n.data),
+      onModelUpdated: refreshTotals,
+      onSelectionChanged: () => {
+        const n = grid.getSelectedRows().length;
+        $('remindSel').disabled = !n;
+        $('remindSel').textContent = n ? `Remind selected (${n})` : 'Remind selected';
+      },
       columnDefs: [
-        { field: 'created', headerName: 'Created', sort: 'desc', width: 140, filter: false,
-          valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') },
-        { field: 'client', width: 150 },
-        { field: 'project', flex: 1, minWidth: 200 },
-        { field: 'status', width: 180, cellRenderer: (p) => pill(p.value) },
-        { field: 'source', width: 120, cellRenderer: (p) => (p.value === 'AI agent' ? '<span class="status s-agent">AI agent</span>' : esc(p.value || '')) },
-        { field: 'plan', width: 120 },
-        { field: 'total', type: 'rightAligned', width: 110, valueFormatter: usd, filter: 'agNumberColumnFilter' },
-        { field: 'paid', type: 'rightAligned', width: 110, valueFormatter: usd, filter: 'agNumberColumnFilter' },
-        { field: 'outstanding', type: 'rightAligned', width: 130, valueFormatter: usd, filter: 'agNumberColumnFilter' },
-        { field: 'reminders', type: 'rightAligned', width: 115, filter: 'agNumberColumnFilter' },
-        { field: 'timeToPay', headerName: 'Time to pay', width: 125, filter: false, valueFormatter: (p) => (p.value == null ? '' : duration(p.value)) },
-        { field: 'invoice', headerName: 'PayPal invoice', width: 230 },
+        { field: 'client', width: 130 },
+        { field: 'project', flex: 1, minWidth: 140 },
+        { field: 'status', width: 125, cellRenderer: (p) => (p.value ? `<span class="status s-${esc(p.value)}">${esc(SHORT[p.value] || LABEL[p.value] || p.value)}</span>` : '') },
+        { field: 'source', width: 90, cellRenderer: (p) => (p.value === 'AI agent' ? '<span class="status s-agent">AI agent</span>' : esc(p.value || '')) },
+        { headerName: 'Money', children: [
+          { field: 'total', type: 'rightAligned', width: 100, valueFormatter: usd, filter: 'agNumberColumnFilter' },
+          { field: 'paid', type: 'rightAligned', width: 95, valueFormatter: usd, filter: 'agNumberColumnFilter',
+            cellClassRules: { settled: (p) => !p.node.rowPinned && p.value > 0 && p.value >= p.data.total } },
+          { field: 'outstanding', headerName: 'Owed', type: 'rightAligned', width: 100, valueFormatter: usd, filter: 'agNumberColumnFilter',
+            cellClassRules: { owed: (p) => !p.node.rowPinned && p.value > 0 } },
+        ] },
+        { headerName: 'Collections', children: [
+          { field: 'waiting', headerName: 'Waiting', width: 80, filter: false, valueFormatter: (p) => (p.value == null ? '' : duration(p.value)) },
+          { colId: 'aging', headerName: 'Aging', width: 105, valueGetter: (p) => (p.node.rowPinned ? '' : aging(p.data.waiting)) },
+          { field: 'reminders', width: 90, filter: 'agNumberColumnFilter',
+            valueFormatter: (p) => (p.node.rowPinned || !p.data.invoice || (!p.value && !VIEWS.open(p.data)) ? '' : `${p.value} of ${state.cfg.maxReminders}`) },
+          { field: 'timeToPay', headerName: 'Time to pay', width: 105, filter: false, valueFormatter: (p) => (p.value == null ? '' : duration(p.value)) },
+        ] },
+        { headerName: 'Record', children: [
+          { field: 'plan', width: 110 },
+          { field: 'created', headerName: 'Created', sort: 'desc', width: 130, filter: false,
+            valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') },
+          { field: 'invoice', headerName: 'PayPal invoice', width: 230 },
+        ] },
       ],
       onRowClicked: (e) => {
-        if (e.rowPinned) return;
+        if (e.rowPinned || (e.event && e.event.target.closest && e.event.target.closest('.ag-selection-checkbox, .ag-checkbox'))) return;
         state.selected = e.data.id;
         showView('pipeline');
         renderJobs();
         renderDetail(true);
       },
     });
+    refreshTotals();
   }
   function renderLedger() {
-    if (!grid) return;
-    const rows = ledgerRows();
-    grid.setGridOption('rowData', rows);
-    grid.setGridOption('pinnedBottomRowData', ledgerTotals(rows));
+    renderChips();
+    if (grid) grid.setGridOption('rowData', ledgerRows()); // onModelUpdated refreshes the totals row
   }
 
   function showView(name) {
@@ -748,12 +810,37 @@
     document.querySelector('.section-head').hidden = name === 'agent';
     if (name === 'ledger') {
       initGrid();
-      $('gridNote').textContent = window.agGrid ? 'Click a row to open the job. Filters and sorting on every column.' : 'The grid library did not load. Check your connection.';
+      $('gridNote').textContent = window.agGrid ? 'Tick unpaid rows to remind several clients at once. Click a row to open the job.' : 'The grid library did not load. Check your connection.';
     }
   }
   document.querySelectorAll('.tabs [data-view]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
   $('gridFilter').addEventListener('input', (e) => grid && grid.setGridOption('quickFilterText', e.target.value));
   $('exportCsv').addEventListener('click', () => grid && grid.exportDataAsCsv({ fileName: 'branch-pay-ledger.csv' }));
+  document.querySelectorAll('#chips .chip').forEach((c) => c.addEventListener('click', () => {
+    ledgerView = c.dataset.f;
+    renderChips();
+    if (grid) grid.onFilterChanged();
+  }));
+  // The Collector agent writes one reminder per ticked job; PayPal sends each. The server still caps them.
+  $('remindSel').addEventListener('click', async () => {
+    const rows = grid ? grid.getSelectedRows() : [];
+    if (!rows.length) return;
+    const btn = $('remindSel');
+    btn.disabled = true;
+    let sent = 0;
+    const failed = [];
+    for (const [i, r] of rows.entries()) {
+      btn.textContent = `Reminding ${i + 1} of ${rows.length}...`;
+      try {
+        const job = await api(`/api/jobs/${encodeURIComponent(r.id)}/remind`, { method: 'POST' });
+        if (job.error) failed.push(job.error); else sent++;
+      } catch (e) { failed.push(e.message); }
+    }
+    grid.deselectAll();
+    btn.textContent = 'Remind selected';
+    await refreshJobs();
+    $('gridNote').textContent = `${sent} reminder${sent === 1 ? '' : 's'} sent through PayPal.` + (failed.length ? ` ${failed.length} failed: ${failed[0]}` : '');
+  });
   $('copyMcp').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText($('mcpUrl').value); $('copyMcp').textContent = 'Copied'; }
     catch { $('mcpUrl').select(); }
