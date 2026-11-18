@@ -4,7 +4,7 @@
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). Sandbox only. No real money moves.
 
-**Live demo: <https://branch-pay.onrender.com>** (free Render instance: the first load after a quiet spell can take about a minute while it wakes up).
+**Live demo: <https://branch-pay-k85r.onrender.com>** (free Render instance: the first load after a quiet spell can take about a minute while it wakes up).
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/shrestha-droid/branch-pay)
 
@@ -12,7 +12,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/). San
 
 ## Try it in two minutes (for judges)
 
-1. Open **<https://branch-pay.onrender.com>** and wait for it to wake up (up to a minute on the free plan).
+1. Open **<https://branch-pay-k85r.onrender.com>** and wait for it to wake up (up to a minute on the free plan).
 2. Click **Fill example**, type any email (a PayPal sandbox buyer email if you have one), and press **Get a quote**. The Scoper prices it in a few seconds.
 3. Press **Approve · 50% deposit first**. The Biller creates and sends real PayPal sandbox invoices; their ids appear on the job.
 4. Press **Demo: pay deposit**. PayPal records the payment, the Builder writes a website, and a watermarked preview appears. Press **Demo: pay balance** to unlock the final files and **Download**.

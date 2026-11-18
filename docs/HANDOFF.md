@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Live app** | <https://branch-pay.onrender.com> |
+| **Live app** | <https://branch-pay-k85r.onrender.com> |
 | **Code** | <https://github.com/shrestha-droid/branch-pay> (public, MIT license) |
 | **Hackathon** | [PayPal AI Hackathon on Devpost](https://paypalaihackathon.devpost.com/) |
 | **Deadline** | November 13, 2026, 1:30 am IST (November 12, 12:00 pm PT) |
